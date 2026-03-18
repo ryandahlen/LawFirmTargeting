@@ -1,10 +1,10 @@
 services:
   - type: web
-    name: law-firm-targeting
+    name: LawFirmTargeting
     env: node
     plan: free
-    buildCommand: npm install --include=dev && npm run build
-    startCommand: npm start
+    buildCommand: npm install --include=dev && npm run build && npm run db:push
+    startCommand: npm run start
     envVars:
       - key: NODE_ENV
         value: production
