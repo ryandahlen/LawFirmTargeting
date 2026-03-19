@@ -8,14 +8,14 @@ export default function Footer() {
           <div className="text-center">
             <div className="flex items-center justify-center">
               <SquareSplitHorizontal className="text-white h-5 w-5 mr-2" />
-              <h2 className="text-white text-lg font-semibold">LegalScout</h2>
+              <h2 className="text-white text-lg font-semibold">SERPScout</h2>
             </div>
-            <p className="text-sm mt-2">Law Firm Intelligence Platform</p>
+            <p className="text-sm mt-2">SERP Intelligence Platform</p>
           </div>
         </div>
         
         <div className="mt-8 pt-6 border-t border-neutral-700 flex justify-center items-center">
-          <p className="text-xs">© {new Date().getFullYear()} Uptime Legal Systems. All rights reserved.</p>
+          <p className="text-xs">© {new Date().getFullYear()} Topical Gravity LLC. All rights reserved.</p>
         </div>
       </div>
     </footer>
