@@ -154,13 +154,13 @@ export default function EmailResultsModal({
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
-            <p className="text-neutral-600">Searching for email addresses using Hunter.io...</p>
+            <p className="text-neutral-600">Searching for email addresses...</p>
             <p className="text-sm text-neutral-500 mt-2">This may take a moment</p>
           </div>
         ) : totalEmails === 0 ? (
           <div className="py-8 text-center">
             <p className="text-neutral-600">No email addresses were found for the selected domains.</p>
-            <p className="text-sm text-neutral-500 mt-1">Try selecting different domains or checking Hunter.io directly.</p>
+            <p className="text-sm text-neutral-500 mt-1">Try selecting different domains.</p>
           </div>
         ) : (
           <>
