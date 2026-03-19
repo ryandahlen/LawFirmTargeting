@@ -63,7 +63,7 @@ export async function searchSerpApi(
     }
 
     const apiKey = process.env.SERPAPI_API_KEY;
-    const maxResultsPerPage = 100; // SerpApi allows up to 100 results per page
+    const maxResultsPerPage = 10; // Google returns ~10 organic results per page
     const totalRequests = Math.ceil(numResults / maxResultsPerPage);
     let allResults: SerpApiSearchResult[] = [];
 
