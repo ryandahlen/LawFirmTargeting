@@ -40,65 +40,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(searchParams.resultCount)
       );
       
-      // Process each URL with OpenAI to analyze the law firms
-      let processedResults = [];
-      let lawFirmsCount = 0;
-      let nonLawFirmsCount = 0;
-      
-      // Log each URL for debugging
-      searchResults.forEach((result, index) => {
-        console.log(`Result ${index + 1}: URL=${result.url}, Title=${result.title}`);
-      });
-      
+      // Process all URLs in parallel to keep total time well under HTTP timeout
       console.log(`Processing ${searchResults.length} search results with OpenAI...`);
-      
-      // Create a progress tracker
-      let processedCount = 0;
-      const updateProgressInterval = setInterval(() => {
-        console.log(`Analysis progress: ${processedCount}/${searchResults.length} URLs processed`);
-      }, 5000); // Log progress every 5 seconds
-      
-      try {
-        for (const result of searchResults) {
+
+      const analysisResults = await Promise.all(
+        searchResults.map(async (result) => {
           try {
-            // Call OpenAI to analyze the website
             const analysis = await analyzeUrl(
-              result.url, 
+              result.url,
               result.title,
               result.snippet,
               searchParams.analysisDepth
             );
-            
-            processedCount++;
-            
-            if (!analysis.isLawFirm) {
-              nonLawFirmsCount++;
-              continue;
-            }
-            
-            lawFirmsCount++;
-            
-            // Save to storage
-            const firm = await storage.createFirm({
-              ...analysis,
-              searchId: search.id,
-            });
-            
-            processedResults.push(firm);
-            
-            // Add a small delay between API calls to avoid rate limits
-            await new Promise(resolve => setTimeout(resolve, 200));
+            return { success: true, analysis } as const;
           } catch (error) {
             console.error(`Error processing URL ${result.url}:`, error);
-            processedCount++;
+            return { success: false } as const;
           }
-        }
-      } finally {
-        // Make sure we clear the interval
-        clearInterval(updateProgressInterval);
-        console.log(`Analysis complete: ${processedCount}/${searchResults.length} URLs processed`);
-        console.log(`Found ${lawFirmsCount} law firms and ${nonLawFirmsCount} non-law firms`);
-      }
+        })
+      );
+
+      // Save law firms to DB
+      const firmInserts = analysisResults
+        .filter((r) => r.success && r.analysis.isLawFirm)
+        .map((r) => r.success ? r.analysis : null)
+        .filter(Boolean);
+
+      const savedFirms = await Promise.all(
+        firmInserts.map((analysis) =>
+          storage.createFirm({ ...analysis!, searchId: search.id })
+        )
+      );
+
+      const lawFirmsCount = savedFirms.length;
+      const nonLawFirmsCount = analysisResults.filter(
+        (r) => r.success && !r.analysis.isLawFirm
+      ).length;
+      const processedResults = savedFirms;
+
+      console.log(`Analysis complete: ${analysisResults.length}/${searchResults.length} URLs processed`);
+      console.log(`Found ${lawFirmsCount} law firms and ${nonLawFirmsCount} non-law firms`);
       
       res.json({
         results: processedResults,
