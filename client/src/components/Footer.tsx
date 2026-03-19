@@ -14,6 +14,9 @@ export default function Footer() {
           </div>
         </div>
 
+        <div className="mt-8 pt-6 border-t border-neutral-700 flex justify-center items-center">
+          <p className="text-xs">© {new Date().getFullYear()} Topical Gravity LLC. All rights reserved.</p>
+        </div>
       </div>
     </footer>
   );
