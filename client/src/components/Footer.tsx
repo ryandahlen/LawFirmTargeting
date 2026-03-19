@@ -13,10 +13,7 @@ export default function Footer() {
             <p className="text-sm mt-2">SERP Intelligence Platform</p>
           </div>
         </div>
-        
-        <div className="mt-8 pt-6 border-t border-neutral-700 flex justify-center items-center">
-          <p className="text-xs">© {new Date().getFullYear()} Topical Gravity LLC. All rights reserved.</p>
-        </div>
+
       </div>
     </footer>
   );
