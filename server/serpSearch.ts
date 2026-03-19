@@ -98,8 +98,8 @@ export async function searchSerpApi(
       allResults = [...allResults, ...results];
       console.log(`Request ${i + 1} returned ${results.length} results`);
 
-      // If we got fewer results than requested, there are no more results
-      if (results.length < Math.min(maxResultsPerPage, numResults - start)) {
+      // If we got no results, there are no more results to fetch
+      if (results.length === 0) {
         break;
       }
 
