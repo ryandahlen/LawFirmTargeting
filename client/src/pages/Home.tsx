@@ -123,15 +123,15 @@ export default function Home() {
                   
                   <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium text-neutral-600">Law Firms</h4>
+                      <h4 className="text-sm font-medium text-neutral-600">Target Businesses</h4>
                       <Landmark className="text-green-600 h-5 w-5" />
                     </div>
                     <p className="text-2xl font-bold mt-2">{stats.lawFirms}</p>
                   </div>
-                  
+
                   <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium text-neutral-600">Non-Law Firms</h4>
+                      <h4 className="text-sm font-medium text-neutral-600">Excluded Results</h4>
                       <Ban className="text-red-600 h-5 w-5" />
                     </div>
                     <p className="text-2xl font-bold mt-2">{stats.nonLawFirms}</p>

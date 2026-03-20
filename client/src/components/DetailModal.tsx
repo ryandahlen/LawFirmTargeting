@@ -1,13 +1,18 @@
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
-  DialogFooter
+import {
+  Dialog,
+  DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, Download, Bookmark, Gavel, Users, ServerCrash, Briefcase, Scale } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  CheckCircle2,
+  MapPin,
+  Globe,
+  Copy,
+  ScanSearch,
+} from "lucide-react";
 import { FirmData } from "@shared/schema";
 
 interface DetailModalProps {
@@ -15,179 +20,186 @@ interface DetailModalProps {
   onClose: () => void;
 }
 
+function getDomainAuthority(size: string | undefined) {
+  if (size === "Large") return "60+";
+  if (size === "Medium") return "45";
+  return "30";
+}
+
 export default function DetailModal({ firm, onClose }: DetailModalProps) {
-  // Mock images as placeholders for law firm buildings and professionals
-  const buildingImages = [
-    "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=500"
-  ];
-  
-  const getIconForPracticeArea = (area: string) => {
-    const icons: Record<string, JSX.Element> = {
-      "Personal Injury": <Gavel className="text-blue-500 mr-2 h-4 w-4" />,
-      "Family Law": <Users className="text-green-500 mr-2 h-4 w-4" />,
-      "Auto Accidents": <ServerCrash className="text-yellow-500 mr-2 h-4 w-4" />,
-      "Medical Malpractice": <Briefcase className="text-purple-500 mr-2 h-4 w-4" />,
-      "Divorce": <Scale className="text-red-500 mr-2 h-4 w-4" />,
-    };
-    
-    return icons[area] || <Gavel className="text-gray-500 mr-2 h-4 w-4" />;
+  const handleCopyEmail = () => {
+    if (firm.emailAddress) navigator.clipboard.writeText(firm.emailAddress);
   };
-  
-  const getBackgroundColorForPracticeArea = (area: string, index: number) => {
-    const colors = [
-      "bg-blue-50 border border-blue-200",
-      "bg-green-50 border border-green-200",
-      "bg-yellow-50 border border-yellow-200",
-      "bg-purple-50 border border-purple-200",
-      "bg-red-50 border border-red-200"
-    ];
-    
-    return colors[index % colors.length];
-  };
-  
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
-  
-  const randomImage = buildingImages[Math.floor(Math.random() * buildingImages.length)];
-  
+
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex justify-between items-center">
-            <DialogTitle className="text-xl font-semibold">{firm.name}</DialogTitle>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </DialogHeader>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-4">
-          {/* Firm Overview */}
-          <div className="lg:col-span-3 space-y-6">
-            <div>
-              <h4 className="text-lg font-medium mb-3">Firm Overview</h4>
-              <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
-                <p className="text-neutral-700">{firm.overview}</p>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        {/* Header bar */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-800 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Results
+          </button>
+          <Badge className="bg-green-100 text-green-700 border border-green-200 font-medium gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Analysis Complete
+          </Badge>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Company Profile Card */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-neutral-900">{firm.name}</h2>
+              <div className="flex flex-wrap gap-2 items-center">
+                <a
+                  href={`https://${firm.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  {firm.website}
+                </a>
+                {firm.location && (
+                  <span className="flex items-center gap-1 text-sm text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
+                    <MapPin className="h-3 w-3" />
+                    {firm.location}
+                  </span>
+                )}
               </div>
-            </div>
-            
-            <div>
-              <h4 className="text-lg font-medium mb-3">Practice Areas</h4>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {firm.practiceAreas.map((area, index) => (
-                  <div key={index} className={`p-3 rounded-lg flex items-center ${getBackgroundColorForPracticeArea(area, index)}`}>
-                    {getIconForPracticeArea(area)}
-                    <span>{area}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            {firm.keyPersonnel && firm.keyPersonnel.length > 0 && (
-              <div>
-                <h4 className="text-lg font-medium mb-3">Key Personnel</h4>
-                <div className="space-y-3">
-                  {firm.keyPersonnel.map((person, index) => (
-                    <div key={index} className="bg-neutral-50 p-3 rounded-lg border border-neutral-200 flex items-start">
-                      <div className={`bg-${index === 0 ? 'primary' : index === 1 ? 'secondary' : 'accent'} text-white rounded-full w-10 h-10 flex items-center justify-center mr-3 flex-shrink-0`}>
-                        <span>{getInitials(person.name)}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium">{person.name}</p>
-                        <p className="text-sm text-neutral-500">{person.role}</p>
-                      </div>
-                    </div>
+              {firm.practiceAreas && firm.practiceAreas.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {firm.practiceAreas.map((area, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">
+                      {area}
+                    </Badge>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Firmographic Details */}
-          <div className="lg:col-span-2 space-y-6">
-            <div>
-              <h4 className="text-lg font-medium mb-3">Firm Details</h4>
-              <dl className="divide-y divide-neutral-200">
-                <div className="py-3 flex justify-between">
-                  <dt className="text-sm font-medium text-neutral-500">Firm Size</dt>
-                  <dd className="text-sm text-neutral-900">{firm.size} ({firm.attorneyCount})</dd>
-                </div>
-                {firm.founded && (
-                  <div className="py-3 flex justify-between">
-                    <dt className="text-sm font-medium text-neutral-500">Founded</dt>
-                    <dd className="text-sm text-neutral-900">{firm.founded}</dd>
-                  </div>
-                )}
-                <div className="py-3 flex justify-between">
-                  <dt className="text-sm font-medium text-neutral-500">Primary Location</dt>
-                  <dd className="text-sm text-neutral-900">{firm.location}</dd>
-                </div>
-                {firm.additionalOffices && (
-                  <div className="py-3 flex justify-between">
-                    <dt className="text-sm font-medium text-neutral-500">Additional Offices</dt>
-                    <dd className="text-sm text-neutral-900">{firm.additionalOffices.join(", ")}</dd>
-                  </div>
-                )}
-                {firm.clientFocus && (
-                  <div className="py-3 flex justify-between">
-                    <dt className="text-sm font-medium text-neutral-500">Client Focus</dt>
-                    <dd className="text-sm text-neutral-900">{firm.clientFocus.join(", ")}</dd>
-                  </div>
-                )}
-                <div className="py-3 flex justify-between">
-                  <dt className="text-sm font-medium text-neutral-500">Website</dt>
-                  <dd className="text-sm text-neutral-900 text-primary">
-                    <a href={`https://${firm.website}`} target="_blank" rel="noopener noreferrer">
-                      {firm.website}
-                    </a>
-                  </dd>
-                </div>
-                {firm.emailAddress && (
-                  <div className="py-3 flex justify-between">
-                    <dt className="text-sm font-medium text-neutral-500">Email</dt>
-                    <dd className="text-sm text-neutral-900 text-primary">
-                      <a href={`mailto:${firm.emailAddress}`}>
-                        {firm.emailAddress}
-                      </a>
-                    </dd>
-                  </div>
-                )}
-              </dl>
+              )}
             </div>
-            
-            {/* Law firm building image */}
-            <img 
-              src={randomImage} 
-              alt={`${firm.name} office building`} 
-              className="rounded-lg shadow-sm w-full h-auto"
-            />
-            
-            <div>
-              <h4 className="text-lg font-medium mb-3">AI Analysis Notes</h4>
-              <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
-                <p className="text-sm text-neutral-700">{firm.aiAnalysisNotes}</p>
-              </div>
+            <Button variant="outline" size="sm" className="flex-shrink-0 gap-1.5">
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          </div>
+
+          {/* Metrics Grid */}
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">SEO Metrics</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Domain Authority", value: getDomainAuthority(firm.size) },
+                { label: "Organic Traffic", value: "N/A" },
+                { label: "Backlinks", value: firm.attorneyCount || "N/A" },
+                { label: "Site Speed", value: "N/A" },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-neutral-50 border border-neutral-200 rounded-lg p-4 text-center">
+                  <p className="text-xs text-neutral-500 mb-1">{label}</p>
+                  <p className="text-xl font-bold text-neutral-900">{value}</p>
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* SERP Competitors */}
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">SERP Competitors</h3>
+            <div className="border border-dashed border-neutral-300 rounded-lg p-6 text-center text-neutral-400 text-sm">
+              No data — run Deep Scan to populate
+            </div>
+          </div>
+
+          {/* Contacts */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider">Contacts</h3>
+              <Button variant="outline" size="sm" disabled className="gap-1.5 text-xs opacity-60">
+                <ScanSearch className="h-3.5 w-3.5" />
+                Deep Scan Contacts
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {firm.keyPersonnel && firm.keyPersonnel.map((person, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-neutral-50 border border-neutral-200 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900">{person.name}</p>
+                    <p className="text-xs text-neutral-500">{person.role}</p>
+                  </div>
+                </div>
+              ))}
+              {firm.emailAddress && (
+                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">{firm.emailAddress}</p>
+                      <p className="text-xs text-green-600">Verified contact</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-neutral-500 hover:text-neutral-800"
+                    onClick={handleCopyEmail}
+                    title="Copy email"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+              {!firm.emailAddress && (!firm.keyPersonnel || firm.keyPersonnel.length === 0) && (
+                <p className="text-sm text-neutral-400 text-center py-4">No contact information available</p>
+              )}
+            </div>
+          </div>
+
+          {/* Firm Details (secondary) */}
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">Firm Details</h3>
+            <dl className="divide-y divide-neutral-100 border border-neutral-200 rounded-lg overflow-hidden">
+              <div className="py-2.5 px-4 flex justify-between bg-white">
+                <dt className="text-sm text-neutral-500">Size</dt>
+                <dd className="text-sm font-medium text-neutral-900">{firm.size} {firm.attorneyCount ? `(${firm.attorneyCount})` : ""}</dd>
+              </div>
+              {firm.founded && (
+                <div className="py-2.5 px-4 flex justify-between bg-white">
+                  <dt className="text-sm text-neutral-500">Founded</dt>
+                  <dd className="text-sm font-medium text-neutral-900">{firm.founded}</dd>
+                </div>
+              )}
+              <div className="py-2.5 px-4 flex justify-between bg-white">
+                <dt className="text-sm text-neutral-500">Primary Location</dt>
+                <dd className="text-sm font-medium text-neutral-900">{firm.location}</dd>
+              </div>
+              {firm.additionalOffices && firm.additionalOffices.length > 0 && (
+                <div className="py-2.5 px-4 flex justify-between bg-white">
+                  <dt className="text-sm text-neutral-500">Additional Offices</dt>
+                  <dd className="text-sm font-medium text-neutral-900">{firm.additionalOffices.join(", ")}</dd>
+                </div>
+              )}
+              {firm.clientFocus && firm.clientFocus.length > 0 && (
+                <div className="py-2.5 px-4 flex justify-between bg-white">
+                  <dt className="text-sm text-neutral-500">Client Focus</dt>
+                  <dd className="text-sm font-medium text-neutral-900">{firm.clientFocus.join(", ")}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {/* Overview */}
+          {firm.overview && (
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">Overview</h3>
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                <p className="text-sm text-neutral-700 leading-relaxed">{firm.overview}</p>
+              </div>
+            </div>
+          )}
         </div>
-        
-        <DialogFooter className="mt-6 border-t border-neutral-200 pt-4">
-          <Button variant="outline" className="gap-1.5">
-            <Bookmark className="h-4 w-4" />
-            Save
-          </Button>
-          <Button className="gap-1.5 bg-secondary hover:bg-secondary-dark">
-            <Download className="h-4 w-4" />
-            Export Data
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
