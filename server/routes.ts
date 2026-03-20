@@ -36,7 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Perform the search with SerpApi
       const searchResults = await searchSerpApi(
-        `${searchParams.practiceArea} ${searchParams.location}`,
+        `${searchParams.practiceArea} lawyer ${searchParams.location}`,
         parseInt(searchParams.resultCount)
       );
       

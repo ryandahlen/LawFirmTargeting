@@ -20,6 +20,11 @@ export async function searchGoogle(
     try {
       console.log(`Searching for: ${query}, with result count: ${resultCount}`);
       
+      // For testing, combine the query with "lawyer" if it's not already there
+      if (!query.toLowerCase().includes("lawyer") && !query.toLowerCase().includes("attorney")) {
+        query = `${query} lawyer`;
+      }
+      
       // Google API only supports up to 10 results per query in free tier
       // We'll need to make multiple requests with different start indices
       const MAX_RESULTS_PER_REQUEST = 10;

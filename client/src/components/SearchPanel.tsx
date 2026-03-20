@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
 
 const searchSchema = z.object({
@@ -21,10 +22,20 @@ interface SearchPanelProps {
   disabled: boolean;
 }
 
+const INDUSTRY_OPTIONS = [
+  "SaaS",
+  "E-commerce",
+  "Real Estate",
+  "Marketing Agencies",
+  "Consulting Firms",
+  "B2B SaaS",
+  "Law Firms",
+];
+
 export default function SearchPanel({ onSearch, disabled }: SearchPanelProps) {
   const [sliderValue, setSliderValue] = useState(50);
 
-  const { register, handleSubmit, formState: { errors }, setValue } = useForm<SearchFormData>({
+  const { register, handleSubmit, formState: { errors }, control, setValue } = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
     defaultValues: {
       location: "",
@@ -63,18 +74,28 @@ export default function SearchPanel({ onSearch, disabled }: SearchPanelProps) {
 
             <div>
               <Label htmlFor="practiceArea" className="block text-sm font-medium text-neutral-700 mb-1">
-                Keyword / Niche
+                Industry / Niche
               </Label>
-              <Input
-                id="practiceArea"
-                placeholder="e.g., divorce lawyer, hvac repair, real estate agent"
-                {...register("practiceArea")}
-                className={errors.practiceArea ? "border-destructive" : ""}
+              <Controller
+                name="practiceArea"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger id="practiceArea" className={errors.practiceArea ? "border-destructive" : ""}>
+                      <SelectValue placeholder="Select an industry" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INDUSTRY_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               />
               {errors.practiceArea && (
                 <p className="text-xs text-destructive mt-1">{errors.practiceArea.message}</p>
               )}
-              <p className="text-xs text-neutral-500 mt-1">The full search phrase used to find businesses</p>
+              <p className="text-xs text-neutral-500 mt-1">Select the business category to target</p>
             </div>
 
             <div>
