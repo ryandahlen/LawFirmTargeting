@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -7,12 +6,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Search } from "lucide-react";
 
 const searchSchema = z.object({
   location: z.string().min(1, "Location is required"),
-  practiceArea: z.string().min(1, "Industry is required"),
+  practiceArea: z.string().min(1, "Practice area is required"),
   resultCount: z.string(),
+  // analysisDepth is now hardcoded to "deep" and removed from the form
 });
 
 type SearchFormData = z.infer<typeof searchSchema>;
@@ -22,33 +23,18 @@ interface SearchPanelProps {
   disabled: boolean;
 }
 
-const INDUSTRY_OPTIONS = [
-  "SaaS",
-  "E-commerce",
-  "Real Estate",
-  "Marketing Agencies",
-  "Consulting Firms",
-  "B2B SaaS",
-  "Law Firms",
-];
-
 export default function SearchPanel({ onSearch, disabled }: SearchPanelProps) {
-  const [sliderValue, setSliderValue] = useState(50);
-
   const { register, handleSubmit, formState: { errors }, control, setValue } = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
     defaultValues: {
       location: "",
       practiceArea: "",
-      resultCount: "50",
+      resultCount: "10",
+      // analysisDepth removed as it's now hardcoded to "deep"
     }
   });
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value);
-    setSliderValue(val);
-    setValue("resultCount", String(val));
-  };
+  // Recent searches removed as per client request
 
   return (
     <section className="lg:col-span-4 space-y-6">
@@ -69,61 +55,50 @@ export default function SearchPanel({ onSearch, disabled }: SearchPanelProps) {
               {errors.location && (
                 <p className="text-xs text-destructive mt-1">{errors.location.message}</p>
               )}
-              <p className="text-xs text-neutral-500 mt-1">City, state, or region to search</p>
+              <p className="text-xs text-neutral-500 mt-1">City, state, or region to search for law firms</p>
             </div>
-
+            
             <div>
               <Label htmlFor="practiceArea" className="block text-sm font-medium text-neutral-700 mb-1">
-                Industry / Niche
+                Practice Area
               </Label>
-              <Controller
-                name="practiceArea"
-                control={control}
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger id="practiceArea" className={errors.practiceArea ? "border-destructive" : ""}>
-                      <SelectValue placeholder="Select an industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INDUSTRY_OPTIONS.map((option) => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <Input
+                id="practiceArea"
+                placeholder="e.g., Criminal Defense, Personal Injury, Family Law"
+                {...register("practiceArea")}
+                className={errors.practiceArea ? "border-destructive" : ""}
               />
               {errors.practiceArea && (
                 <p className="text-xs text-destructive mt-1">{errors.practiceArea.message}</p>
               )}
-              <p className="text-xs text-neutral-500 mt-1">Select the business category to target</p>
+              <p className="text-xs text-neutral-500 mt-1">Enter any legal practice area you want to search for</p>
             </div>
-
+            
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label htmlFor="resultCount" className="block text-sm font-medium text-neutral-700">
-                  Result Count
-                </Label>
-                <span className="text-sm font-semibold text-primary">{sliderValue} results</span>
-              </div>
-              <input
-                id="resultCount"
-                type="range"
-                min={10}
-                max={100}
-                step={10}
-                value={sliderValue}
-                onChange={handleSliderChange}
-                className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-primary"
-              />
-              <div className="flex justify-between text-xs text-neutral-400 mt-1">
-                <span>10</span>
-                <span>100</span>
-              </div>
+              <Label htmlFor="resultCount" className="block text-sm font-medium text-neutral-700 mb-1">
+                Result Count
+              </Label>
+              <Select
+                onValueChange={(value) => setValue("resultCount", value)}
+                defaultValue="10"
+              >
+                <SelectTrigger id="resultCount">
+                  <SelectValue placeholder="Select result count" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 results</SelectItem>
+                  <SelectItem value="20">20 results</SelectItem>
+                  <SelectItem value="50">50 results</SelectItem>
+                  <SelectItem value="100">100 results</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
+            
+            {/* Analysis Depth selector removed and set to always use "deep" */}
+            
             <Button type="submit" className="w-full" disabled={disabled}>
               <Search className="mr-2 h-4 w-4" />
-              Run Analysis
+              Start Analysis
             </Button>
           </form>
         </CardContent>

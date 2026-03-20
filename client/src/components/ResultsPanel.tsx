@@ -1,26 +1,26 @@
-import { useState, useEffect, useRef } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
+import { useState } from "react";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
 } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious 
 } from "@/components/ui/pagination";
 import {
   Select,
@@ -29,21 +29,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Download,
-  Filter,
-  ExternalLink,
-  Check,
-  Loader2,
-  Circle,
-  Mail,
-  X
+import { 
+  Download, 
+  Filter, 
+  Search as SearchIcon, 
+  Landmark, 
+  Ban, 
+  Check, 
+  Loader2, 
+  Hourglass,
+  Mail
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FirmData } from "@shared/schema";
 import EmailResultsModal from "./EmailResultsModal";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ResultsPanelProps {
   results: FirmData[];
@@ -58,31 +60,6 @@ interface ResultsPanelProps {
   showStatsOnly?: boolean;
   showResultsOnly?: boolean;
 }
-
-const LOG_TEMPLATES = [
-  "[FETCH] Retrieving SERP page {n}...",
-  "[PARSE] Extracted {n} results from page",
-  "[MATCH] Business classified as target",
-  "[SKIP] Non-matching result filtered out",
-  "[FETCH] Loading business website...",
-  "[PARSE] Scanning contact information",
-  "[MATCH] Email pattern detected",
-  "[SKIP] Duplicate domain ignored",
-];
-
-function getPipelineStage(progress: number) {
-  if (progress < 5) return 0;
-  if (progress < 60) return 1;
-  if (progress < 85) return 2;
-  return 3;
-}
-
-const PIPELINE_STAGES = [
-  "Initialize Scraper",
-  "Extracting SERPs",
-  "Classify Businesses",
-  "Extract Contacts",
-];
 
 export default function ResultsPanel({
   results,
@@ -99,86 +76,84 @@ export default function ResultsPanel({
   const [emailResults, setEmailResults] = useState<any[]>([]);
   const [emailLookupLoading, setEmailLookupLoading] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [logLines, setLogLines] = useState<string[]>([]);
-  const [startTime] = useState(() => new Date());
-  const logRef = useRef<HTMLDivElement>(null);
-
-  // Simulate live log feed during analysis
-  useEffect(() => {
-    if (!searchInProgress) {
-      setLogLines([]);
-      return;
-    }
-    const interval = setInterval(() => {
-      const template = LOG_TEMPLATES[Math.floor(Math.random() * LOG_TEMPLATES.length)];
-      const line = template.replace("{n}", String(Math.floor(Math.random() * 50) + 1));
-      setLogLines(prev => {
-        const next = [...prev, line];
-        return next.slice(-12); // keep last 12 lines
-      });
-    }, 600);
-    return () => clearInterval(interval);
-  }, [searchInProgress]);
-
-  // Auto-scroll log to bottom
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [logLines]);
-
+  
   const paginatedResults = results.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  
   const totalPages = Math.ceil(results.length / itemsPerPage);
-
+  
+  // Handle selecting all firms on current page
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       const newSelected = new Set(selectedFirms);
       paginatedResults.forEach(firm => {
-        if (firm.id !== undefined && firm.isLawFirm) newSelected.add(firm.id);
+        if (firm.id !== undefined && firm.isLawFirm) {
+          newSelected.add(firm.id);
+        }
       });
       setSelectedFirms(newSelected);
     } else {
+      // Only deselect firms on the current page
       const newSelected = new Set(selectedFirms);
       paginatedResults.forEach(firm => {
-        if (firm.id !== undefined) newSelected.delete(firm.id);
+        if (firm.id !== undefined) {
+          newSelected.delete(firm.id);
+        }
       });
       setSelectedFirms(newSelected);
     }
   };
-
+  
+  // Handle selecting a single firm
   const handleSelectFirm = (firmId: number | undefined, checked: boolean) => {
     if (firmId === undefined) return;
+    
     const newSelected = new Set(selectedFirms);
-    if (checked) newSelected.add(firmId);
-    else newSelected.delete(firmId);
+    if (checked) {
+      newSelected.add(firmId);
+    } else {
+      newSelected.delete(firmId);
+    }
     setSelectedFirms(newSelected);
   };
-
-  const areAllSelected = paginatedResults.length > 0 &&
-    paginatedResults.every(firm =>
+  
+  // Check if all firms on current page are selected
+  const areAllSelected = paginatedResults.length > 0 && 
+    paginatedResults.every(firm => 
       firm.id !== undefined && (!firm.isLawFirm || selectedFirms.has(firm.id))
     );
-
-  const getSelectedDomains = () =>
-    results
+  
+  // Get domains of selected firms
+  const getSelectedDomains = () => {
+    return results
       .filter(firm => firm.id !== undefined && selectedFirms.has(firm.id))
       .map(firm => firm.website);
-
+  };
+  
+  // Handle finding emails for selected domains
   const handleFindEmails = async () => {
     const domains = getSelectedDomains();
+    
     if (domains.length === 0) return;
+    
     setEmailLookupLoading(true);
     setEmailModalOpen(true);
+    
     try {
       const response = await fetch('/api/find-emails', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ domains })
       });
-      if (!response.ok) throw new Error('Failed to fetch emails');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch emails');
+      }
+      
       const data = await response.json();
       setEmailResults(data.results);
     } catch (error) {
@@ -188,10 +163,13 @@ export default function ResultsPanel({
       setEmailLookupLoading(false);
     }
   };
-
+  
   const handleExport = async () => {
+    // Import the xlsx library dynamically
     const XLSX = await import('xlsx');
-    const headers = ["Business Name", "Website", "Email", "Size", "Industries", "Location"];
+    
+    // Prepare data for Excel
+    const headers = ["Firm Name", "Website", "Email", "Size", "Practice Areas", "Location"];
     const rows = results.map(firm => [
       firm.name,
       firm.website,
@@ -200,121 +178,182 @@ export default function ResultsPanel({
       firm.practiceAreas.join(", "),
       firm.location
     ]);
+    
+    // Create worksheet
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    
+    // Create workbook
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Businesses");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Law Firms");
+    
+    // Generate XLSX file
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    
+    // Create Blob and download
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", "serpscout_analysis.xlsx");
+    link.setAttribute("download", "law_firm_analysis.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  const handleGenerateReport = () => {
+    // Generate a more detailed report
+    let reportContent = `# Law Firm Analysis Report\n\n`;
+    reportContent += `**Date Generated:** ${new Date().toLocaleDateString()}\n\n`;
+    reportContent += `**Total Firms Analyzed:** ${results.length}\n\n`;
+    reportContent += `**Law Firms Found:** ${stats.lawFirms}\n\n`;
+    reportContent += `**Non-Law Firms Found:** ${stats.nonLawFirms}\n\n`;
+    
+    reportContent += `## Firm Details\n\n`;
+    
+    results.forEach((firm, index) => {
+      reportContent += `### ${index + 1}. ${firm.name}\n\n`;
+      reportContent += `**Website:** ${firm.website}\n\n`;
+      
+      if (firm.emailAddress) {
+        reportContent += `**Email:** ${firm.emailAddress}\n\n`;
+      }
+      
+      reportContent += `**Size:** ${firm.size}\n\n`;
+      reportContent += `**Attorney Count:** ${firm.attorneyCount}\n\n`;
+      reportContent += `**Practice Areas:** ${firm.practiceAreas.join(", ")}\n\n`;
+      reportContent += `**Location:** ${firm.location}\n\n`;
+      
+      if (firm.additionalOffices && firm.additionalOffices.length > 0) {
+        reportContent += `**Additional Offices:** ${firm.additionalOffices.join(", ")}\n\n`;
+      }
+      
+      if (firm.founded) {
+        reportContent += `**Founded:** ${firm.founded}\n\n`;
+      }
+      
+      if (firm.clientFocus && firm.clientFocus.length > 0) {
+        reportContent += `**Client Focus:** ${firm.clientFocus.join(", ")}\n\n`;
+      }
+      
+      if (firm.keyPersonnel && firm.keyPersonnel.length > 0) {
+        reportContent += `**Key Personnel:**\n\n`;
+        firm.keyPersonnel.forEach(person => {
+          reportContent += `- ${person.name} (${person.role})\n`;
+        });
+        reportContent += `\n`;
+      }
+      
+      reportContent += `**Overview:**\n\n${firm.overview}\n\n`;
+      
+      if (firm.aiAnalysisNotes) {
+        reportContent += `**AI Notes:**\n\n${firm.aiAnalysisNotes}\n\n`;
+      }
+      
+      reportContent += `---\n\n`;
+    });
+    
+    // Create a download link for the markdown report
+    const blob = new Blob([reportContent], { type: "text/markdown;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "law_firm_detailed_report.md");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Derived progress metrics
-  const totalAnalyzedSim = Math.round(progress * 0.12);
-  const targetSim = Math.round(totalAnalyzedSim * 0.6);
-  const excludedSim = totalAnalyzedSim - targetSim;
-  const elapsedSec = Math.floor((Date.now() - startTime.getTime()) / 1000);
-  const estRemaining = progress > 5
-    ? Math.max(0, Math.round((elapsedSec / (progress / 100)) - elapsedSec))
-    : null;
-
-  const activeStage = getPipelineStage(progress);
-
-  const getStageIcon = (stageIdx: number) => {
-    if (stageIdx < activeStage) return <Check className="h-4 w-4 text-green-500" />;
-    if (stageIdx === activeStage) return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
-    return <Circle className="h-4 w-4 text-neutral-300" />;
+  const renderPracticeAreaBadges = (practiceAreas: string[]) => {
+    const colors = [
+      "bg-blue-100 text-blue-800",
+      "bg-green-100 text-green-800",
+      "bg-purple-100 text-purple-800",
+      "bg-yellow-100 text-yellow-800",
+      "bg-red-100 text-red-800"
+    ];
+    
+    return practiceAreas.map((area, index) => (
+      <Badge key={index} variant="outline" className={`mr-1 ${colors[index % colors.length]}`}>
+        {area}
+      </Badge>
+    ));
   };
 
   return (
     <section className="space-y-6">
-      {/* Active Analysis Panel */}
+      {/* Stats section removed since it's now displayed separately */}
       {searchInProgress && (
-        <Card className="border-primary/30">
-          <CardContent className="p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold tracking-widest text-primary uppercase">Lead Generation</p>
-                <h3 className="text-lg font-bold">Analysis in Progress</h3>
-              </div>
-              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80">
-                <X className="mr-1.5 h-4 w-4" />
-                Cancel
-              </Button>
-            </div>
-
-            {/* Progress bar */}
-            <div>
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Analysis in Progress</h3>
+            <div className="mb-4">
               <div className="flex justify-between mb-1">
-                <span className="text-xs font-medium text-neutral-500">Overall Progress</span>
-                <span className="text-xs font-semibold">{Math.round(progress)}%</span>
+                <span className="text-sm font-medium">Overall Progress</span>
+                <span className="text-sm font-medium">{Math.round(progress)}%</span>
               </div>
-              <Progress value={progress} className="h-2" />
+              <Progress value={progress} className="h-2.5" />
             </div>
-
-            {/* Pipeline stages */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {PIPELINE_STAGES.map((stage, i) => (
-                <div key={stage} className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${i === activeStage ? "border-primary/40 bg-primary/5" : i < activeStage ? "border-green-200 bg-green-50" : "border-neutral-200 bg-neutral-50"}`}>
-                  {getStageIcon(i)}
-                  <span className={`text-xs font-medium ${i < activeStage ? "text-green-700" : i === activeStage ? "text-primary" : "text-neutral-400"}`}>{stage}</span>
+            
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 h-8 w-8 mr-3 flex items-center justify-center">
+                  <Check className="text-green-600 h-5 w-5" />
                 </div>
-              ))}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">Finding search results</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                <div className="flex-shrink-0 h-8 w-8 mr-3 flex items-center justify-center">
+                  <Loader2 className="text-primary h-5 w-5 animate-spin" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">
+                    {progress < 50 ? "Searching for law firms..." : "Analyzing websites..."}
+                  </p>
+                  <p className="text-xs text-neutral-500">This may take several minutes for large result sets</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                <div className="flex-shrink-0 h-8 w-8 mr-3 flex items-center justify-center">
+                  <Hourglass className="text-neutral-400 h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-neutral-500 truncate">Analyzing law firm data</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center">
+                <div className="flex-shrink-0 h-8 w-8 mr-3 flex items-center justify-center">
+                  <Hourglass className="text-neutral-400 h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-neutral-500 truncate">Generating report</p>
+                </div>
+              </div>
             </div>
-
-            {/* Metrics row */}
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-neutral-50 rounded-lg p-3 border border-neutral-200">
-                <p className="text-xs text-neutral-500 mb-1">Total Analyzed</p>
-                <p className="text-xl font-bold">{totalAnalyzedSim}</p>
-              </div>
-              <div className="bg-neutral-50 rounded-lg p-3 border border-neutral-200">
-                <p className="text-xs text-neutral-500 mb-1">Target Businesses</p>
-                <p className="text-xl font-bold text-green-600">{targetSim}</p>
-              </div>
-              <div className="bg-neutral-50 rounded-lg p-3 border border-neutral-200">
-                <p className="text-xs text-neutral-500 mb-1">Excluded</p>
-                <p className="text-xl font-bold text-neutral-400">{excludedSim}</p>
-              </div>
-            </div>
-
-            {/* Live log feed */}
-            <div>
-              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-1">Live Feed</p>
-              <div
-                ref={logRef}
-                className="bg-neutral-950 text-green-400 font-mono text-xs rounded-lg p-3 h-28 overflow-y-auto space-y-0.5"
-              >
-                {logLines.map((line, i) => (
-                  <div key={i}>{line}</div>
-                ))}
-                {logLines.length === 0 && <div className="text-neutral-600">Initializing...</div>}
-              </div>
-            </div>
-
-            {estRemaining !== null && (
-              <p className="text-xs text-neutral-500">
-                Estimated time remaining: <span className="font-medium">{estRemaining}s</span>
-              </p>
-            )}
+            
+            <Button variant="ghost" className="mt-6 text-destructive hover:text-destructive/80 font-medium">
+              <span className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4"><circle cx="12" cy="12" r="10"></circle><rect x="9" y="9" width="6" height="6"></rect></svg>
+                Cancel Analysis
+              </span>
+            </Button>
           </CardContent>
         </Card>
       )}
-
+      
       {/* Results Table */}
       <Card className="overflow-hidden">
         <CardHeader className="border-b border-neutral-200 py-4">
           <div className="flex justify-between items-center">
             <CardTitle className="text-lg">Analysis Results</CardTitle>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
+              <Button 
+                variant="outline" 
+                size="sm" 
                 className="h-9"
                 disabled={selectedFirms.size === 0}
                 onClick={handleFindEmails}
@@ -326,30 +365,34 @@ export default function ResultsPanel({
                 <Filter className="mr-1.5 h-4 w-4" />
                 Filter
               </Button>
-              <Button variant="default" size="sm" className="h-9" onClick={handleExport}>
+              <Button variant="default" size="sm" className="h-9 bg-secondary hover:bg-secondary-dark" onClick={handleExport}>
                 <Download className="mr-1.5 h-4 w-4" />
-                Export CSV
+                Export Excel
+              </Button>
+              <Button variant="outline" size="sm" className="h-9" onClick={handleGenerateReport}>
+                <Download className="mr-1.5 h-4 w-4" />
+                Detailed Report
               </Button>
             </div>
           </div>
         </CardHeader>
-
+        
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-neutral-50">
               <TableRow>
                 <TableHead className="w-10 text-center">
-                  <Checkbox
-                    checked={areAllSelected}
+                  <Checkbox 
+                    checked={areAllSelected} 
                     onCheckedChange={handleSelectAll}
                     disabled={searchInProgress || results.length === 0}
                     className="w-4 h-4"
                   />
                 </TableHead>
-                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Business Name</TableHead>
-                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Website</TableHead>
-                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Phone</TableHead>
-                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Emails Found</TableHead>
+                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Firm Name</TableHead>
+                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Size</TableHead>
+                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Practice Areas</TableHead>
+                <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Location</TableHead>
                 <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -359,8 +402,8 @@ export default function ResultsPanel({
                   <TableRow key={index}>
                     <TableCell className="text-center">
                       {firm.isLawFirm && (
-                        <Checkbox
-                          checked={firm.id !== undefined && selectedFirms.has(firm.id)}
+                        <Checkbox 
+                          checked={firm.id !== undefined && selectedFirms.has(firm.id)} 
                           onCheckedChange={(checked) => firm.id && handleSelectFirm(firm.id, !!checked)}
                           className="w-4 h-4"
                         />
@@ -369,35 +412,23 @@ export default function ResultsPanel({
                     <TableCell className="whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-neutral-900">{firm.name}</div>
-                        <div className="text-xs text-neutral-400">{firm.website}</div>
+                        <div className="text-sm text-neutral-500">{firm.website}</div>
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <a
-                        href={`https://${firm.website}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline flex items-center gap-1"
-                      >
-                        {firm.website}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-neutral-400">
-                      —
+                      <div className="text-sm text-neutral-900">{firm.size}</div>
+                      <div className="text-sm text-neutral-500">{firm.attorneyCount}</div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <Badge
-                        variant={firm.emailAddress ? "default" : "secondary"}
-                        className={firm.emailAddress ? "bg-green-100 text-green-800 border-green-200" : ""}
-                      >
-                        {firm.emailAddress ? "1" : "0"}
-                      </Badge>
+                      {renderPracticeAreaBadges(firm.practiceAreas)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-neutral-900">
+                      {firm.location}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm font-medium">
-                      <Button
-                        variant="link"
-                        className="text-primary hover:text-primary/80 p-0"
+                      <Button 
+                        variant="link" 
+                        className="text-primary hover:text-primary-dark"
                         onClick={() => onViewFirm(firm)}
                       >
                         View
@@ -408,7 +439,7 @@ export default function ResultsPanel({
               ) : (
                 !searchInProgress && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-neutral-500">
+                    <TableCell colSpan={5} className="text-center py-10 text-neutral-500">
                       No results found. Try adjusting your search parameters.
                     </TableCell>
                   </TableRow>
@@ -417,7 +448,7 @@ export default function ResultsPanel({
             </TableBody>
           </Table>
         </div>
-
+        
         {results.length > 0 && (
           <div className="bg-white px-4 py-3 border-t border-neutral-200 sm:px-6">
             <div className="flex items-center justify-between">
@@ -430,7 +461,7 @@ export default function ResultsPanel({
                     </span>{" "}
                     of <span className="font-medium">{results.length}</span> results
                   </p>
-
+                  
                   <div className="flex items-center gap-2">
                     <label htmlFor="items-per-page" className="text-sm text-neutral-600">
                       Show:
@@ -439,7 +470,7 @@ export default function ResultsPanel({
                       value={itemsPerPage.toString()}
                       onValueChange={(value) => {
                         setItemsPerPage(parseInt(value));
-                        setCurrentPage(1);
+                        setCurrentPage(1); // Reset to first page when changing items per page
                       }}
                     >
                       <SelectTrigger className="h-8 w-[80px]">
@@ -457,15 +488,15 @@ export default function ResultsPanel({
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
+                      <PaginationPrevious 
+                        href="#" 
                         onClick={(e) => {
                           e.preventDefault();
                           if (currentPage > 1) setCurrentPage(currentPage - 1);
                         }}
                       />
                     </PaginationItem>
-
+                    
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                       <PaginationItem key={page}>
                         <PaginationLink
@@ -480,10 +511,10 @@ export default function ResultsPanel({
                         </PaginationLink>
                       </PaginationItem>
                     ))}
-
+                    
                     <PaginationItem>
-                      <PaginationNext
-                        href="#"
+                      <PaginationNext 
+                        href="#" 
                         onClick={(e) => {
                           e.preventDefault();
                           if (currentPage < totalPages) setCurrentPage(currentPage + 1);
@@ -497,8 +528,9 @@ export default function ResultsPanel({
           </div>
         )}
       </Card>
-
-      <EmailResultsModal
+      
+      {/* Email Results Modal */}
+      <EmailResultsModal 
         isOpen={emailModalOpen}
         onClose={() => setEmailModalOpen(false)}
         results={emailResults}
