@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Search } from "lucide-react";
 
 const searchSchema = z.object({
@@ -24,12 +22,12 @@ interface SearchPanelProps {
 }
 
 export default function SearchPanel({ onSearch, disabled }: SearchPanelProps) {
-  const { register, handleSubmit, formState: { errors }, control, setValue } = useForm<SearchFormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
     defaultValues: {
       location: "",
       practiceArea: "",
-      resultCount: "10",
+      resultCount: "20",
       // analysisDepth removed as it's now hardcoded to "deep"
     }
   });
@@ -74,25 +72,6 @@ export default function SearchPanel({ onSearch, disabled }: SearchPanelProps) {
               <p className="text-xs text-neutral-500 mt-1">Enter any legal practice area you want to search for</p>
             </div>
             
-            <div>
-              <Label htmlFor="resultCount" className="block text-sm font-medium text-neutral-700 mb-1">
-                Result Count
-              </Label>
-              <Select
-                onValueChange={(value) => setValue("resultCount", value)}
-                defaultValue="10"
-              >
-                <SelectTrigger id="resultCount">
-                  <SelectValue placeholder="Select result count" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10 results</SelectItem>
-                  <SelectItem value="20">20 results</SelectItem>
-                  <SelectItem value="50">50 results</SelectItem>
-                  <SelectItem value="100">100 results</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             
             {/* Analysis Depth selector removed and set to always use "deep" */}
             
