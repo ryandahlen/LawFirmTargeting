@@ -1,10 +1,11 @@
-import { 
-  type Search, 
-  type Firm, 
-  type InsertSearch, 
+import {
+  type Search,
+  type Firm,
+  type InsertSearch,
   type InsertFirm,
   type FirmData,
-  type SearchParams
+  type SearchParams,
+  type KeyPerson
 } from "@shared/schema";
 
 export interface IStorage {
@@ -52,7 +53,20 @@ export class MemStorage implements IStorage {
   async createFirm(firm: InsertFirm): Promise<Firm> {
     const id = this.firmIdCounter++;
     const createdAt = new Date();
-    const newFirm: Firm = { ...firm, id, createdAt };
+    const newFirm: Firm = {
+      ...firm,
+      id,
+      createdAt,
+      size: firm.size ?? null,
+      emailAddress: firm.emailAddress ?? null,
+      attorneyCount: firm.attorneyCount ?? null,
+      searchId: firm.searchId ?? null,
+      additionalOffices: firm.additionalOffices ?? null,
+      founded: firm.founded ?? null,
+      clientFocus: firm.clientFocus ?? null,
+      keyPersonnel: (firm.keyPersonnel ?? null) as KeyPerson[] | null,
+      aiAnalysisNotes: firm.aiAnalysisNotes ?? null,
+    };
     this.firms.set(id, newFirm);
     return newFirm;
   }

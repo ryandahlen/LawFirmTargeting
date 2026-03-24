@@ -6,6 +6,7 @@ import { searchGoogle } from "./search";
 import { searchSerpApi } from "./serpSearch";
 import { analyzeUrl } from "./openai";
 import { findEmailsByDomain, type EmailResult } from "./hunter";
+import { sendEmail } from "./email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
@@ -175,6 +176,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error in email lookup:", error);
       res.status(400).json({ 
         error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Send personalized emails via Resend
+  app.post("/api/send-emails", async (req, res) => {
+    try {
+      const schema = z.object({
+        recipients: z.array(z.object({
+          email: z.string().email(),
+          firmName: z.string(),
+          location: z.string(),
+          practiceArea: z.string(),
+        })).min(1, "At least one recipient is required"),
+        subjectTemplate: z.string().min(1, "Subject is required"),
+        bodyTemplate: z.string().min(1, "Body is required"),
+        fromName: z.string().min(1, "From name is required"),
+        fromEmail: z.string().email(),
+      });
+
+      const { recipients, subjectTemplate, bodyTemplate, fromName, fromEmail } = schema.parse(req.body);
+
+      // Validate fromEmail against configured FROM_EMAIL env var
+      const configuredFromEmail = process.env.FROM_EMAIL;
+      if (configuredFromEmail && fromEmail !== configuredFromEmail) {
+        return res.status(400).json({ error: `From email must be ${configuredFromEmail}` });
+      }
+
+      const interpolate = (template: string, vars: Record<string, string>) =>
+        template
+          .replace(/\{\{firmName\}\}/g, vars.firmName)
+          .replace(/\{\{location\}\}/g, vars.location)
+          .replace(/\{\{practiceArea\}\}/g, vars.practiceArea);
+
+      const results: Array<{ email: string; success: boolean; error?: string }> = [];
+
+      for (const recipient of recipients) {
+        const vars = {
+          firmName: recipient.firmName,
+          location: recipient.location,
+          practiceArea: recipient.practiceArea,
+        };
+
+        const subject = interpolate(subjectTemplate, vars);
+        const html = interpolate(bodyTemplate, vars);
+        const text = html.replace(/<[^>]+>/g, '');
+
+        try {
+          await sendEmail({ to: recipient.email, fromName, fromEmail, subject, html, text });
+          results.push({ email: recipient.email, success: true });
+        } catch (error) {
+          console.error(`Failed to send email to ${recipient.email}:`, error);
+          results.push({
+            email: recipient.email,
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+
+        // Small delay between sends to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      console.log(`Email send complete: ${results.filter(r => r.success).length}/${results.length} succeeded`);
+      res.json({ results });
+    } catch (error) {
+      console.error("Error sending emails:", error);
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   });

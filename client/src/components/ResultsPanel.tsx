@@ -29,22 +29,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Download, 
-  Filter, 
-  Search as SearchIcon, 
-  Landmark, 
-  Ban, 
-  Check, 
-  Loader2, 
+import {
+  Download,
+  Filter,
+  Search as SearchIcon,
+  Landmark,
+  Ban,
+  Check,
+  Loader2,
   Hourglass,
-  Mail
+  Mail,
+  Send
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FirmData } from "@shared/schema";
 import EmailResultsModal from "./EmailResultsModal";
+import ComposeEmailModal from "./ComposeEmailModal";
 import { apiRequest } from "@/lib/queryClient";
 
 interface ResultsPanelProps {
@@ -75,7 +77,13 @@ export default function ResultsPanel({
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailResults, setEmailResults] = useState<any[]>([]);
   const [emailLookupLoading, setEmailLookupLoading] = useState(false);
+  const [composeModalOpen, setComposeModalOpen] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Selected firms that have an emailAddress
+  const selectedFirmsWithEmail = results.filter(
+    (firm) => firm.id !== undefined && selectedFirms.has(firm.id) && firm.emailAddress
+  );
   
   const paginatedResults = results.slice(
     (currentPage - 1) * itemsPerPage,
@@ -351,15 +359,25 @@ export default function ResultsPanel({
           <div className="flex justify-between items-center">
             <CardTitle className="text-lg">Analysis Results</CardTitle>
             <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="h-9"
                 disabled={selectedFirms.size === 0}
                 onClick={handleFindEmails}
               >
                 <Mail className="mr-1.5 h-4 w-4" />
                 Find Emails ({selectedFirms.size})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9"
+                disabled={selectedFirmsWithEmail.length === 0}
+                onClick={() => setComposeModalOpen(true)}
+              >
+                <Send className="mr-1.5 h-4 w-4" />
+                Compose &amp; Send ({selectedFirmsWithEmail.length})
               </Button>
               <Button variant="outline" size="sm" className="h-9">
                 <Filter className="mr-1.5 h-4 w-4" />
@@ -530,11 +548,18 @@ export default function ResultsPanel({
       </Card>
       
       {/* Email Results Modal */}
-      <EmailResultsModal 
+      <EmailResultsModal
         isOpen={emailModalOpen}
         onClose={() => setEmailModalOpen(false)}
         results={emailResults}
         isLoading={emailLookupLoading}
+      />
+
+      {/* Compose & Send Modal */}
+      <ComposeEmailModal
+        isOpen={composeModalOpen}
+        onClose={() => setComposeModalOpen(false)}
+        recipients={selectedFirmsWithEmail}
       />
     </section>
   );
