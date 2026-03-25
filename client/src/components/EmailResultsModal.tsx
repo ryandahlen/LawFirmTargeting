@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -8,14 +8,15 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, X, Loader2 } from "lucide-react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import { Checkbox } from "@/components/ui/checkbox";
+import { Download, Send, Loader2 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
@@ -34,38 +35,44 @@ interface EmailResult {
   error?: string;
 }
 
+export interface SelectedContact {
+  email: string;
+  firmName: string;
+  domain: string;
+}
+
 interface EmailResultsModalProps {
   isOpen: boolean;
   onClose: () => void;
   results: EmailResult[];
   isLoading: boolean;
+  onSendWithTool?: (contacts: SelectedContact[]) => void;
 }
 
 export default function EmailResultsModal({
   isOpen,
   onClose,
   results,
-  isLoading
+  isLoading,
+  onSendWithTool,
 }: EmailResultsModalProps) {
   const [sortField, setSortField] = useState<'domain' | 'confidence'>('domain');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
 
-  // Count total emails found
   const totalEmails = results.reduce((total, result) => total + result.emails.length, 0);
-  
-  // Combine all emails into a flat list for sorting and display
-  const flattenedEmails = results.flatMap(result => 
+
+  const flattenedEmails = results.flatMap(result =>
     result.emails.map(email => ({
       domain: result.domain,
       organization: result.organization,
       ...email
     }))
   );
-  
-  // Sort the emails based on current sort settings
+
   const sortedEmails = [...flattenedEmails].sort((a, b) => {
     if (sortField === 'domain') {
-      return sortDirection === 'asc' 
+      return sortDirection === 'asc'
         ? a.domain.localeCompare(b.domain)
         : b.domain.localeCompare(a.domain);
     } else {
@@ -75,7 +82,12 @@ export default function EmailResultsModal({
     }
   });
 
-  // Handle sort click
+  // Default all emails to selected when results load
+  const allEmailAddresses = new Set(flattenedEmails.map(e => e.email));
+  const effectiveSelected = selectedEmails.size === 0 && flattenedEmails.length > 0
+    ? allEmailAddresses
+    : selectedEmails;
+
   const handleSort = (field: 'domain' | 'confidence') => {
     if (field === sortField) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -85,16 +97,36 @@ export default function EmailResultsModal({
     }
   };
 
-  // Handle export to Excel
+  const handleToggleEmail = (email: string) => {
+    const next = new Set(effectiveSelected);
+    if (next.has(email)) {
+      next.delete(email);
+    } else {
+      next.add(email);
+    }
+    setSelectedEmails(next);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedEmails(new Set(flattenedEmails.map(e => e.email)));
+    } else {
+      setSelectedEmails(new Set());
+    }
+  };
+
+  const allSelected = flattenedEmails.length > 0 &&
+    flattenedEmails.every(e => effectiveSelected.has(e.email));
+
+  const selectedCount = effectiveSelected.size;
+
   const handleExport = async () => {
-    if (flattenedEmails.length === 0) return;
-    
-    // Import xlsx dynamically
+    const toExport = flattenedEmails.filter(e => effectiveSelected.has(e.email));
+    if (toExport.length === 0) return;
+
     const XLSX = await import('xlsx');
-    
-    // Prepare data for Excel
     const headers = ["Domain", "Organization", "Email", "First Name", "Last Name", "Position", "Confidence"];
-    const rows = flattenedEmails.map(email => [
+    const rows = toExport.map(email => [
       email.domain,
       email.organization || "N/A",
       email.email,
@@ -103,18 +135,10 @@ export default function EmailResultsModal({
       email.position || "N/A",
       email.confidence
     ]);
-    
-    // Create worksheet
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    
-    // Create workbook
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Email Contacts");
-    
-    // Generate XLSX file
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    
-    // Create Blob and download
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -125,7 +149,17 @@ export default function EmailResultsModal({
     document.body.removeChild(link);
   };
 
-  // Generate confidence badge color based on confidence score
+  const handleSendWithTool = () => {
+    const contacts: SelectedContact[] = flattenedEmails
+      .filter(e => effectiveSelected.has(e.email))
+      .map(e => ({
+        email: e.email,
+        firmName: e.organization || e.domain,
+        domain: e.domain,
+      }));
+    onSendWithTool?.(contacts);
+  };
+
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 80) return "bg-green-100 text-green-800";
     if (confidence >= 50) return "bg-yellow-100 text-yellow-800";
@@ -136,17 +170,12 @@ export default function EmailResultsModal({
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl flex items-center justify-between">
-            <span>Email Addresses Found</span>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
+          <DialogTitle className="text-xl">Email Addresses Found</DialogTitle>
           <DialogDescription>
             {isLoading ? (
               "Searching for email addresses..."
             ) : (
-              `Found ${totalEmails} email addresses across ${results.length} domains`
+              `Found ${totalEmails} email address${totalEmails !== 1 ? "es" : ""} across ${results.length} domain${results.length !== 1 ? "s" : ""}`
             )}
           </DialogDescription>
         </DialogHeader>
@@ -168,7 +197,14 @@ export default function EmailResultsModal({
               <Table>
                 <TableHeader className="bg-neutral-50">
                   <TableRow>
-                    <TableHead 
+                    <TableHead className="w-10 text-center">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={handleSelectAll}
+                        className="w-4 h-4"
+                      />
+                    </TableHead>
+                    <TableHead
                       className="text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer"
                       onClick={() => handleSort('domain')}
                     >
@@ -186,7 +222,7 @@ export default function EmailResultsModal({
                     <TableHead className="text-xs font-medium text-neutral-500 uppercase tracking-wider">
                       Position
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer"
                       onClick={() => handleSort('confidence')}
                     >
@@ -196,7 +232,14 @@ export default function EmailResultsModal({
                 </TableHeader>
                 <TableBody>
                   {sortedEmails.map((email, index) => (
-                    <TableRow key={index}>
+                    <TableRow key={index} className={effectiveSelected.has(email.email) ? "" : "opacity-40"}>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={effectiveSelected.has(email.email)}
+                          onCheckedChange={() => handleToggleEmail(email.email)}
+                          className="w-4 h-4"
+                        />
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-sm">{email.domain}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm">{email.organization || "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
@@ -209,7 +252,7 @@ export default function EmailResultsModal({
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm">{email.position || "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <Badge variant="outline" className={`${getConfidenceBadge(email.confidence)}`}>
+                        <Badge variant="outline" className={getConfidenceBadge(email.confidence)}>
                           {email.confidence}%
                         </Badge>
                       </TableCell>
@@ -220,22 +263,26 @@ export default function EmailResultsModal({
             </div>
 
             <DialogFooter className="mt-6 gap-2">
-              <Button
-                variant="outline"
-                className="mr-auto"
-                onClick={onClose}
-              >
+              <Button variant="outline" className="mr-auto" onClick={onClose}>
                 Close
               </Button>
               <Button
-                variant="default"
-                className="bg-secondary hover:bg-secondary-dark"
+                variant="outline"
                 onClick={handleExport}
-                disabled={flattenedEmails.length === 0}
+                disabled={selectedCount === 0}
               >
                 <Download className="mr-2 h-4 w-4" />
-                Export Excel
+                Export Selected ({selectedCount})
               </Button>
+              {onSendWithTool && (
+                <Button
+                  onClick={handleSendWithTool}
+                  disabled={selectedCount === 0}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Send with Tool ({selectedCount})
+                </Button>
+              )}
             </DialogFooter>
           </>
         )}

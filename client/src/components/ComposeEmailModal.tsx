@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,15 +11,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Send, CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { FirmData } from "@shared/schema";
 
-interface Recipient {
+export interface ComposeRecipient {
   email: string;
   firmName: string;
   location: string;
   practiceArea: string;
+}
+
+interface Recipient extends ComposeRecipient {
   included: boolean;
 }
 
@@ -32,7 +33,7 @@ interface SendResult {
 interface ComposeEmailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  recipients: Array<Pick<FirmData, "name" | "emailAddress" | "location" | "practiceAreas">>;
+  recipients: ComposeRecipient[];
 }
 
 function interpolate(template: string, vars: Record<string, string>): string {
@@ -47,17 +48,8 @@ export default function ComposeEmailModal({ isOpen, onClose, recipients: rawReci
   const fromName = "Ryan Dahlen";
 
   const [recipients, setRecipients] = useState<Recipient[]>(() =>
-    rawRecipients
-      .filter((r) => r.emailAddress)
-      .map((r) => ({
-        email: r.emailAddress!,
-        firmName: r.name,
-        location: r.location,
-        practiceArea: r.practiceAreas[0] ?? "",
-        included: true,
-      }))
+    rawRecipients.map((r) => ({ ...r, included: true }))
   );
-
   const [subject, setSubject] = useState("Quick question for {{firmName}}");
   const [body, setBody] = useState(
     `<p>Hi {{firmName}},</p>\n\n<p>I came across your firm and wanted to reach out about...</p>\n\n<p>Best,<br/>Ryan</p>`
@@ -66,6 +58,15 @@ export default function ComposeEmailModal({ isOpen, onClose, recipients: rawReci
   const [showPreview, setShowPreview] = useState(true);
   const [sending, setSending] = useState(false);
   const [sendResults, setSendResults] = useState<SendResult[] | null>(null);
+
+  // Re-sync recipients when the modal opens with new data
+  useEffect(() => {
+    if (isOpen) {
+      setRecipients(rawRecipients.map((r) => ({ ...r, included: true })));
+      setSendResults(null);
+      setPreviewIndex(0);
+    }
+  }, [isOpen, rawRecipients]);
 
   const subjectRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);

@@ -32,21 +32,17 @@ import {
 import {
   Download,
   Filter,
-  Search as SearchIcon,
-  Landmark,
-  Ban,
   Check,
   Loader2,
   Hourglass,
   Mail,
-  Send
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FirmData } from "@shared/schema";
-import EmailResultsModal from "./EmailResultsModal";
-import ComposeEmailModal from "./ComposeEmailModal";
+import EmailResultsModal, { type SelectedContact } from "./EmailResultsModal";
+import ComposeEmailModal, { type ComposeRecipient } from "./ComposeEmailModal";
 import { apiRequest } from "@/lib/queryClient";
 
 interface ResultsPanelProps {
@@ -78,12 +74,8 @@ export default function ResultsPanel({
   const [emailResults, setEmailResults] = useState<any[]>([]);
   const [emailLookupLoading, setEmailLookupLoading] = useState(false);
   const [composeModalOpen, setComposeModalOpen] = useState(false);
+  const [composeRecipients, setComposeRecipients] = useState<ComposeRecipient[]>([]);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-
-  // Selected firms that have an emailAddress
-  const selectedFirmsWithEmail = results.filter(
-    (firm) => firm.id !== undefined && selectedFirms.has(firm.id) && firm.emailAddress
-  );
   
   const paginatedResults = results.slice(
     (currentPage - 1) * itemsPerPage,
@@ -172,6 +164,21 @@ export default function ResultsPanel({
     }
   };
   
+  const handleSendWithTool = (contacts: SelectedContact[]) => {
+    const enriched: ComposeRecipient[] = contacts.map(contact => {
+      const firm = results.find(f => f.website === contact.domain);
+      return {
+        email: contact.email,
+        firmName: contact.firmName,
+        location: firm?.location ?? "",
+        practiceArea: firm?.practiceAreas[0] ?? "",
+      };
+    });
+    setComposeRecipients(enriched);
+    setEmailModalOpen(false);
+    setComposeModalOpen(true);
+  };
+
   const handleExport = async () => {
     // Import the xlsx library dynamically
     const XLSX = await import('xlsx');
@@ -369,16 +376,6 @@ export default function ResultsPanel({
                 <Mail className="mr-1.5 h-4 w-4" />
                 Find Emails ({selectedFirms.size})
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9"
-                disabled={selectedFirmsWithEmail.length === 0}
-                onClick={() => setComposeModalOpen(true)}
-              >
-                <Send className="mr-1.5 h-4 w-4" />
-                Compose &amp; Send ({selectedFirmsWithEmail.length})
-              </Button>
               <Button variant="outline" size="sm" className="h-9">
                 <Filter className="mr-1.5 h-4 w-4" />
                 Filter
@@ -553,13 +550,13 @@ export default function ResultsPanel({
         onClose={() => setEmailModalOpen(false)}
         results={emailResults}
         isLoading={emailLookupLoading}
+        onSendWithTool={handleSendWithTool}
       />
 
-      {/* Compose & Send Modal */}
       <ComposeEmailModal
         isOpen={composeModalOpen}
         onClose={() => setComposeModalOpen(false)}
-        recipients={selectedFirmsWithEmail}
+        recipients={composeRecipients}
       />
     </section>
   );
