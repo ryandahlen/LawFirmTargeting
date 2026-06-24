@@ -16,3 +16,7 @@ services:
         sync: false
       - key: FROM_EMAIL
         sync: false
+      - key: APP_USERNAME
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
