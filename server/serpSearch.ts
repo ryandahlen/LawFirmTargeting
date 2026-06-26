@@ -88,8 +88,12 @@ export async function searchSerpApi(
         }
       });
 
+      // SerpApi omits organic_results entirely when a page has no results
+      // (e.g. requesting page 2 of a query that only returned 9 results).
+      const organicResults = response.data.organic_results ?? [];
+
       // Extract only the information we need
-      const results = response.data.organic_results.map(result => ({
+      const results = organicResults.map(result => ({
         title: result.title,
         url: result.link, // Make sure we're using url for compatibility with the rest of the application
         snippet: result.snippet || ''
