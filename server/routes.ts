@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { storage } from "./storage";
 import { searchGoogle } from "./search";
@@ -8,37 +9,52 @@ import { analyzeUrl } from "./openai";
 import { findEmailsByDomain, type EmailResult } from "./hunter";
 import { sendEmail } from "./email";
 
+// Stricter limits for endpoints that call paid APIs or send email.
+const expensiveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please slow down." },
+});
+
+const sendEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many send requests, please slow down." },
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
-  app.post("/api/search", async (req, res) => {
+  app.post("/api/search", expensiveLimiter, async (req, res) => {
     try {
       const searchParamsSchema = z.object({
         location: z.string().min(1, "Location is required"),
         practiceArea: z.string().min(1, "Practice area is required"),
-        resultCount: z.string(),
+        // Coerce to a bounded integer to prevent unbounded paid-API fan-out.
+        resultCount: z.coerce.number().int().min(1).max(50),
         // Allow analysisDepth to be optional since we're removing it from the UI
         analysisDepth: z.enum(["basic", "standard", "deep"]).optional(),
       });
 
       // Parse the form data and always set analysisDepth to "deep"
       const parsedParams = searchParamsSchema.parse(req.body);
-      const searchParams = {
-        ...parsedParams,
-        analysisDepth: "deep" // Always use deep analysis
-      };
-      
-      // Save search to database
+      const resultCount = parsedParams.resultCount;
+
+      // Save search to database (result_count is a text column)
       const search = await storage.createSearch({
-        location: searchParams.location,
-        practiceArea: searchParams.practiceArea,
-        resultCount: searchParams.resultCount,
-        analysisDepth: searchParams.analysisDepth,
+        location: parsedParams.location,
+        practiceArea: parsedParams.practiceArea,
+        resultCount: String(resultCount),
+        analysisDepth: "deep", // Always use deep analysis
       });
-      
+
       // Perform the search with SerpApi
       const searchResults = await searchSerpApi(
-        `${searchParams.practiceArea} lawyer ${searchParams.location}`,
-        parseInt(searchParams.resultCount)
+        `${parsedParams.practiceArea} lawyer ${parsedParams.location}`,
+        resultCount
       );
       
       // Process all URLs in parallel to keep total time well under HTTP timeout
@@ -51,7 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               result.url,
               result.title,
               result.snippet,
-              searchParams.analysisDepth
+              "deep"
             );
             return { success: true, analysis } as const;
           } catch (error) {
@@ -92,10 +108,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid request" });
+      }
       console.error("Search error:", error);
-      res.status(400).json({ 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
+      res.status(500).json({ error: "Search failed. Please try again." });
     }
   });
   
@@ -140,12 +157,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Find emails for domains using Hunter.io API
-  app.post("/api/find-emails", async (req, res) => {
+  app.post("/api/find-emails", expensiveLimiter, async (req, res) => {
     try {
       const schema = z.object({
-        domains: z.array(z.string()).min(1, "At least one domain is required")
+        domains: z.array(z.string()).min(1, "At least one domain is required").max(50, "Too many domains in one request")
       });
-      
+
       const { domains } = schema.parse(req.body);
       console.log(`Finding emails for ${domains.length} domains using Hunter.io API...`);
       
@@ -173,15 +190,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Completed email lookup for ${domains.length} domains`);
       res.json({ results });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid request" });
+      }
       console.error("Error in email lookup:", error);
-      res.status(400).json({ 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
+      res.status(500).json({ error: "Email lookup failed. Please try again." });
     }
   });
 
   // Send personalized emails via Resend
-  app.post("/api/send-emails", async (req, res) => {
+  app.post("/api/send-emails", sendEmailLimiter, async (req, res) => {
     try {
       const schema = z.object({
         recipients: z.array(z.object({
@@ -189,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firmName: z.string(),
           location: z.string(),
           practiceArea: z.string(),
-        })).min(1, "At least one recipient is required"),
+        })).min(1, "At least one recipient is required").max(100, "Too many recipients in one request"),
         subjectTemplate: z.string().min(1, "Subject is required"),
         bodyTemplate: z.string().min(1, "Body is required"),
         fromName: z.string().min(1, "From name is required"),
@@ -242,10 +260,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Email send complete: ${results.filter(r => r.success).length}/${results.length} succeeded`);
       res.json({ results });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid request" });
+      }
       console.error("Error sending emails:", error);
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      res.status(500).json({ error: "Failed to send emails. Please try again." });
     }
   });
 

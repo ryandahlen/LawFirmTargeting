@@ -1,15 +1,37 @@
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { basicAuth } from "./auth";
 
 const app = express();
 
+// Behind Render's proxy: trust the first hop so rate limiting and logging see
+// the real client IP (via X-Forwarded-For) rather than the proxy's.
+app.set("trust proxy", 1);
+
+// Security headers. CSP is left off because the Vite-built SPA relies on inline
+// scripts/styles; a strict policy needs separate tuning and would break the app.
+app.use(helmet({ contentSecurityPolicy: false }));
+
 // Gate the entire app (API + SPA) behind HTTP Basic Auth before anything else.
 app.use(basicAuth);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Baseline rate limit for all API routes (defense-in-depth on top of auth).
+app.use(
+  "/api",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests, please try again later." },
+  }),
+);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -48,8 +70,10 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    console.error("Unhandled error:", err);
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
   });
 
   // importantly only setup vite in development and after
